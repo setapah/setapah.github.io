@@ -1,13 +1,31 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Avitá Cabral | Visualizador IFC</title><style>body{margin:0;background:#171c1d;color:#f4f0e8;font:15px Arial}header{position:absolute;z-index:3;top:20px;left:20px;background:#1d2425e8;padding:20px;border-radius:12px;max-width:320px;box-shadow:0 8px 30px #0005}h1{font-weight:400;letter-spacing:3px;font-size:24px;margin:0 0 12px}p{line-height:1.5;color:#c9c9c4}label{display:block;background:#a59a7b;color:#141819;padding:12px;text-align:center;cursor:pointer;border-radius:5px;font-weight:bold}input{display:none}#status{font-size:13px;margin-top:12px}canvas{display:block}small{display:block;margin-top:12px;color:#bbb}</style><script type="importmap">{"imports":{"three":"https://esm.sh/three@0.160.1","three/addons/":"https://esm.sh/three@0.160.1/examples/jsm/"}}</script></head><body><header><h1>AVITÁ CABRAL</h1><p>Visualizador arquitetônico 3D. Selecione o arquivo IFC original para carregar a geometria no navegador.</p><label for="file">SELECIONAR ARQUIVO .IFC</label><input id="file" type="file" accept=".ifc"><div id="status">Aguardando arquivo IFC.</div><small>Gire com o mouse ou toque; use a roda para zoom. O arquivo é processado localmente no seu navegador e não é enviado ao GitHub.</small></header><script type="module">
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Avitá Cabral | Visualizador IFC</title><style>body{margin:0;background:#171c1d;color:#f4f0e8;font:15px Arial}header{position:absolute;z-index:3;top:20px;left:20px;background:#1d2425e8;padding:20px;border-radius:12px;max-width:320px;box-shadow:0 8px 30px #0005}h1{font-weight:400;letter-spacing:3px;font-size:24px;margin:0 0 12px}p{line-height:1.5;color:#c9c9c4}label{display:block;background:#a59a7b;color:#141819;padding:12px;text-align:center;cursor:pointer;border-radius:5px;font-weight:bold}input{display:none}#status{font-size:13px;margin-top:12px}canvas{display:block}small{display:block;margin-top:12px;color:#bbb}</style><script type="importmap">{"imports":{"three":"https://esm.sh/three@0.160.1","three/addons/":"https://esm.sh/three@0.160.1/examples/jsm/"}}</script></head><body><header><h1>AVITÁ CABRAL</h1><p>Visualizador BIM com cores do IFC, iluminação e materiais arquitetônicos preliminares. Selecione o arquivo original para visualizar.</p><label for="file">SELECIONAR ARQUIVO .IFC</label><input id="file" type="file" accept=".ifc"><div id="status">Aguardando arquivo IFC.</div><small>Gire com o mouse ou toque; use a roda para zoom. O arquivo é processado localmente no seu navegador e não é enviado ao GitHub.</small></header><script type="module">
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {IfcAPI} from 'https://cdn.jsdelivr.net/npm/web-ifc@0.0.66/web-ifc-api.js';
-const status=document.querySelector('#status');const scene=new THREE.Scene();scene.background=new THREE.Color(0x283235);
+const status=document.querySelector('#status');const scene=new THREE.Scene();scene.background=new THREE.Color(0xb7c6c8);
 const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,100000);camera.position.set(50,45,65);
-const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));document.body.appendChild(renderer.domElement);
-scene.add(new THREE.HemisphereLight(0xffffff,0x586064,2.2));const sun=new THREE.DirectionalLight(0xffffff,2.5);sun.position.set(30,80,40);scene.add(sun);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.18;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.setPixelRatio(Math.min(devicePixelRatio,2));document.body.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff,0x586064,2.2));const sun=new THREE.DirectionalLight(0xffffff,2.5);sun.position.set(30,80,40);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-130;sun.shadow.camera.right=130;sun.shadow.camera.top=130;sun.shadow.camera.bottom=-130;scene.add(sun);
 const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;
 const group=new THREE.Group();scene.add(group);
+const materials=new Map();
+function matFor(rgba,name){
+ let r=rgba?.x,g=rgba?.y,b=rgba?.z,a=rgba?.w;
+ const valid=[r,g,b].every(v=>Number.isFinite(v)&&v>=0&&v<=1);
+ let key=valid?[r,g,b].map(v=>Math.round(v*100)).join('-'):'neutral';
+ const n=(name||'').toLowerCase();
+ let color=valid?new THREE.Color(r,g,b):new THREE.Color('#d9d7d1');
+ let metalness=.04,roughness=.82,transparent=false,opacity=1;
+ if(/vidro|glass|glazing|janela|window/.test(n)){color=new THREE.Color('#6e9097');metalness=.18;roughness=.14;transparent=true;opacity=.65;key+='glass'}
+ else if(/madeira|wood|ripado|forro/.test(n)){color=new THREE.Color('#9b7655');roughness=.72;key+='wood'}
+ else if(/metal|alumin|guarda.corpo|railing/.test(n)){color=new THREE.Color('#545957');metalness=.65;roughness=.32;key+='metal'}
+ else if(/concreto|concrete/.test(n)){color=new THREE.Color('#bcbcb5');roughness=.9;key+='concrete'}
+ else if(/veget|jardineira|plant/.test(n)){color=new THREE.Color('#55724c');roughness=.94;key+='green'}
+ else if(valid && a<.85){transparent=true;opacity=Math.max(.3,a);roughness=.24;metalness=.1}
+ if(!materials.has(key))materials.set(key,new THREE.MeshStandardMaterial({color,metalness,roughness,transparent,opacity,side:THREE.DoubleSide}));
+ return materials.get(key);
+}
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(1000,1000),new THREE.MeshStandardMaterial({color:'#adb5ad',roughness:1}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;ground.visible=false;scene.add(ground);
 function frame(){controls.update();renderer.render(scene,camera);requestAnimationFrame(frame)}frame();
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 document.querySelector('#file').addEventListener('change',async ev=>{
@@ -18,20 +36,20 @@ document.querySelector('#file').addEventListener('change',async ev=>{
  const bytes=new Uint8Array(await file.arrayBuffer());const model=api.OpenModel(bytes,{COORDINATE_TO_ORIGIN:true});
  let count=0;const material=new THREE.MeshStandardMaterial({color:0xd6d3c9,metalness:.05,roughness:.85,side:THREE.DoubleSide});
  api.StreamAllMeshes(model,flat=>{
-  for(let i=0;i<flat.geometries.size();i++){
+  let itemName='';try{const data=api.GetLine(model,flat.expressID,false);itemName=[data?.Name?.value,data?.ObjectType?.value,data?.Description?.value].filter(Boolean).join(' ')}catch(e){}for(let i=0;i<flat.geometries.size();i++){
    const pg=flat.geometries.get(i);const g=api.GetGeometry(model,pg.geometryExpressID);
    const vs=api.GetVertexArray(g.GetVertexData(),g.GetVertexDataSize());
    const ids=api.GetIndexArray(g.GetIndexData(),g.GetIndexDataSize());
    const positions=new Float32Array(vs.length/6*3);
    for(let j=0;j<vs.length/6;j++){positions[j*3]=vs[j*6];positions[j*3+1]=vs[j*6+1];positions[j*3+2]=vs[j*6+2]}
    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(positions,3));geo.setIndex(Array.from(ids));geo.computeVertexNormals();
-   const m=new THREE.Mesh(geo,material);const matrix=new THREE.Matrix4().fromArray(Array.from(pg.flatTransformation));m.applyMatrix4(matrix);group.add(m);g.delete();count++;
+   const m=new THREE.Mesh(geo,matFor(pg.color,itemName));m.castShadow=true;m.receiveShadow=true;const matrix=new THREE.Matrix4().fromArray(Array.from(pg.flatTransformation));m.applyMatrix4(matrix);group.add(m);g.delete();count++;
   }
  });
  api.CloseModel(model);
  if(!count)throw Error('O IFC não retornou superfícies visíveis.');
- const bounds=new THREE.Box3().setFromObject(group);const center=bounds.getCenter(new THREE.Vector3());const size=bounds.getSize(new THREE.Vector3());group.position.sub(center);const radius=Math.max(size.length(),1);camera.position.set(radius*.7,radius*.5,radius*.7);camera.near=Math.max(radius/10000,.01);camera.far=radius*20;camera.updateProjectionMatrix();controls.target.set(0,0,0);controls.update();
- status.textContent='Modelo carregado: '+count+' superfícies. Geometria BIM sem acabamentos fotorrealistas.';
+ const bounds=new THREE.Box3().setFromObject(group);const center=bounds.getCenter(new THREE.Vector3());const size=bounds.getSize(new THREE.Vector3());group.position.sub(center);ground.position.y=-size.y/2-.04;ground.visible=true;const radius=Math.max(size.length(),1);camera.position.set(radius*.7,radius*.5,radius*.7);camera.near=Math.max(radius/10000,.01);camera.far=radius*20;camera.updateProjectionMatrix();controls.target.set(0,0,0);controls.update();
+ status.textContent='Modelo carregado: '+count+' superfícies. Cores IFC e materiais arquitetônicos aproximados; ainda não são os acabamentos finais dos renders.';
  }catch(err){console.error(err);status.textContent='Erro ao carregar IFC: '+(err?.message||err)+'. Tente Chrome no computador.'}
 });
 </script></body></html>
